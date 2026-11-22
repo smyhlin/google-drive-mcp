@@ -112,6 +112,18 @@ describe('Streamable HTTP request body limit', () => {
     assert.equal(res.status, 200);
   });
 
+  it('passes large upload bodies through without JSON parsing', async () => {
+    const baseUrl = await appWith();
+    const body = JSON.stringify('x'.repeat(OLD_DEFAULT_LIMIT * 2));
+    const res = await fetch(`${baseUrl}/upload/invalid-token`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    await res.text();
+    assert.equal(res.status, 404);
+  });
+
   it('rejects a body over the configured limit as JSON-RPC, not HTML', async () => {
     const baseUrl = await appWith({ maxBodyBytes: 2048 });
     const res = await fetch(`${baseUrl}/mcp`, {

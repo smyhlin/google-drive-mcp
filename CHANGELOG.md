@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+### Added
+
+- **drive:** In HTTP mode, `createUploadUrl` returns a one-use, 10-minute server URL that streams large upload bodies to Google Drive without buffering the complete file. `createDownloadUrl` issues expiring, use-limited download capabilities and streams Drive content to HTTP clients; both transfer URLs are bound to the Google user who created them in team mode.
+- **http:** `GOOGLE_DRIVE_MCP_TOOL_PROFILE=core` limits `tools/list` to 16 file-workflow tools and omits `uploadFile.localPath`; tools remain callable by name for compatibility.
 
 ## [2.13.0](https://github.com/piotr-agier/google-drive-mcp/compare/v2.12.0...v2.13.0) (2026-10-15)
 

@@ -57,6 +57,8 @@ export const TOOL_META: Record<string, ToolMeta> = {
   listFolder: read(DRIVE_READ_SCOPES),
   listSharedDrives: read(DRIVE_READ_SCOPES),
   downloadFile: read(DRIVE_READ_SCOPES),
+  createDownloadUrl: read(DRIVE_READ_SCOPES),
+  createUploadUrl: write(DRIVE_WRITE_SCOPES),
   listPermissions: read(DRIVE_READ_SCOPES),
   getRevisions: read(DRIVE_READ_SCOPES),
 

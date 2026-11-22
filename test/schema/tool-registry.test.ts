@@ -3,7 +3,7 @@ import { describe, it, before, after } from 'node:test';
 import { setupTestServer, type TestContext } from '../helpers/setup-server.js';
 import { TOOL_META } from '../../src/tools/toolMeta.js';
 
-const EXPECTED_TOOL_COUNT = 130;
+const EXPECTED_TOOL_COUNT = 132;
 
 const EXPECTED_TOOLS = [
   'manage_accounts',
@@ -28,7 +28,7 @@ const EXPECTED_TOOLS = [
   'insertSlidesImageFromUrl', 'insertSlidesLocalImage', 'moveSlideElement', 'deleteSlideElement', 'getSlideElementInfo',
   'createShortcut',
   'lockFile', 'unlockFile',
-  'uploadFile', 'downloadFile', 'listPermissions', 'addPermission', 'updatePermission', 'removePermission', 'shareFile', 'getRevisions', 'restoreRevision', 'authGetStatus', 'authListScopes', 'authTestFileAccess',
+  'uploadFile', 'downloadFile', 'createUploadUrl', 'createDownloadUrl', 'listPermissions', 'addPermission', 'updatePermission', 'removePermission', 'shareFile', 'getRevisions', 'restoreRevision', 'authGetStatus', 'authListScopes', 'authTestFileAccess',
   'listCalendars', 'getCalendarEvents', 'getCalendarEvent',
   'createCalendarEvent', 'updateCalendarEvent', 'deleteCalendarEvent',
   'insertTable', 'editTableCell', 'insertImageFromUrl', 'insertLocalImage',

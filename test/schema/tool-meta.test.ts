@@ -6,6 +6,7 @@ import * as docsTools from '../../src/tools/docs.js';
 import * as sheetsTools from '../../src/tools/sheets.js';
 import * as slidesTools from '../../src/tools/slides.js';
 import * as calendarTools from '../../src/tools/calendar.js';
+import * as largeFileTransferTools from '../../src/tools/largeFileTransfer.js';
 import { ADMIN_TOOLS, TOOL_META } from '../../src/tools/toolMeta.js';
 
 // ---------------------------------------------------------------------------
@@ -23,6 +24,7 @@ const registeredToolNames: string[] = [
   sheetsTools,
   slidesTools,
   calendarTools,
+  largeFileTransferTools,
 ].flatMap((m) => m.toolDefinitions.map((d) => d.name));
 
 test('every registered tool has a TOOL_META entry', () => {

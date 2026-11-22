@@ -44,7 +44,7 @@ import {
   ALL_DRIVES_LIST_PARAMS,
   PARENT_SCOPED_LIST_PARAMS,
 } from './utils.js';
-import type { AccountOps, AddAccountResult, ToolContext, ToolResult } from './types.js';
+import type { AccountOps, AddAccountResult, ToolContext, ToolDefinition, ToolResult } from './types.js';
 import { errorResponse } from './types.js';
 import { loadRuntimeConfig, parseBoolEnv, type RuntimeConfig } from './utils/cliArgs.js';
 import { allAuthModeOverrideEnvVars } from './auth/externalAuth.js';
@@ -59,6 +59,7 @@ import * as sheetsTools from './tools/sheets.js';
 import * as slidesTools from './tools/slides.js';
 import * as calendarTools from './tools/calendar.js';
 import { ADMIN_TOOLS, FALLBACK_META, TOOL_META } from './tools/toolMeta.js';
+import * as largeFileTransferTools from './tools/largeFileTransfer.js';
 
 const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 
@@ -470,7 +471,45 @@ async function checkFileExists(name: string, parentFolderId: string = 'root', dr
 // -----------------------------------------------------------------------------
 // DOMAIN MODULES
 // -----------------------------------------------------------------------------
-const domainModules = [driveTools, docsTools, sheetsTools, slidesTools, calendarTools];
+const domainModules = [driveTools, docsTools, sheetsTools, slidesTools, calendarTools, largeFileTransferTools];
+const CORE_TOOL_NAMES: ReadonlySet<string> = new Set([
+  'search',
+  'listFolder',
+  'createFolder',
+  'moveItem',
+  'renameItem',
+  'copyFile',
+  'deleteItem',
+  'addPermission',
+  'listPermissions',
+  'removePermission',
+  'readTextFile',
+  'createTextFile',
+  'updateTextFile',
+  'uploadFile',
+  'createUploadUrl',
+  'createDownloadUrl',
+]);
+
+function applyToolProfile(definitions: ToolDefinition[]): ToolDefinition[] {
+  if (process.env.GOOGLE_DRIVE_MCP_TOOL_PROFILE !== 'core') return definitions;
+  return definitions
+    .filter((definition) => CORE_TOOL_NAMES.has(definition.name))
+    .map((definition) => {
+      if (definition.name !== 'uploadFile') return definition;
+      const properties = definition.inputSchema.properties as Record<string, unknown>;
+      return {
+        ...definition,
+        inputSchema: {
+          ...definition.inputSchema,
+          properties: Object.fromEntries(
+            Object.entries(properties).filter(([name]) => name !== 'localPath'),
+          ),
+          required: ['contentBase64'],
+        },
+      };
+    });
+}
 
 // -----------------------------------------------------------------------------
 // Per-tool `account` parameter plumbing
@@ -624,6 +663,8 @@ async function buildToolContext(
       drive ? checkFileExists(name, parentFolderId, drive) : noAccount(),
     validateTextFileExtension,
     runtimeConfig,
+    accountAlias: account?.alias,
+    uploadEndpointAvailable: sessionId !== STDIO_SESSION_ID,
 
     // Multi-account surface
     sessionId,
@@ -769,6 +810,7 @@ async function buildTeamToolContext(
     validateTextFileExtension,
     runtimeConfig,
     userId: sub,
+    uploadEndpointAvailable: sessionId !== STDIO_SESSION_ID,
 
     sessionId,
     resolveAccount: async () => {
@@ -824,7 +866,7 @@ function createMcpServer(config: RuntimeConfig = runtimeConfig): Server {
   }
 
   s.setRequestHandler(ListToolsRequestSchema, async () => {
-    const definitions = domainModules.flatMap((m) => m.toolDefinitions);
+    const definitions = applyToolProfile(domainModules.flatMap((m) => m.toolDefinitions));
     if (teamRuntime) {
       // Team mode: identity comes from the bearer, so the `account` parameter
       // is never injected and local account management is not offered. Local
@@ -1351,6 +1393,7 @@ interface CreateHttpAppOptions {
 
 /** Every path `app.post('/mcp')` matches, for middleware that must agree with it. */
 const MCP_PATH = /^\/mcp\/?$/i;
+const UPLOAD_PATH = /^\/upload\/[^/]+\/?$/i;
 
 /** The hostnames the SDK's localhostHostValidation() accepts. */
 const LOCALHOST_HOSTS = ['127.0.0.1', 'localhost', '::1'];
@@ -1379,7 +1422,9 @@ function buildMcpExpressApp(host: string, allowedHosts: string[] | undefined) {
   // sends /mcp/ and /MCP through the default parser and then answers that
   // parser's 413 with this route's much larger limit.
   const defaultJson = express.json();
-  app.use((req, res, next) => (MCP_PATH.test(req.path) ? next() : defaultJson(req, res, next)));
+  app.use((req, res, next) =>
+    MCP_PATH.test(req.path) || UPLOAD_PATH.test(req.path) ? next() : defaultJson(req, res, next),
+  );
   if (allowedHosts) {
     app.use(hostHeaderValidation(allowedHosts));
   } else if (LOCALHOST_HOSTS.includes(host)) {
@@ -1478,6 +1523,45 @@ function createHttpApp(host: string, options?: CreateHttpAppOptions) {
     : [];
   const sessions = new Map<string, HttpSession>();
   const sessionTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  app.put('/upload/:token', async (req, res) => {
+    await largeFileTransferTools.streamUpload(req, res, async ({ userId, accountAlias }) => {
+      if (teamAuth) {
+        if (!userId || !(await teamAuth.store.getUser(userId))) {
+          throw new Error('The Google account associated with this upload is no longer authorized.');
+        }
+        return teamAuth.clientFactory.getClient(userId);
+      }
+      if (accountAlias) {
+        const account = requireAuthSystem().store.get(accountAlias);
+        if (!account) throw new Error('The Google account associated with this upload is no longer authorized.');
+        return getAuthClientFor(account);
+      }
+      return getAuthClientFor(await getDefaultAccount());
+    });
+  });
+
+  app.get('/dl/:token', async (req, res) => {
+    try {
+      await largeFileTransferTools.streamDownload(req, res, async ({ userId, accountAlias }) => {
+        if (teamAuth) {
+          if (!userId || !(await teamAuth.store.getUser(userId))) {
+            throw new Error('The Google account associated with this download is no longer authorized.');
+          }
+          return teamAuth.clientFactory.getDrive(userId);
+        }
+        if (accountAlias) {
+          const account = requireAuthSystem().store.get(accountAlias);
+          if (!account) throw new Error('The Google account associated with this download is no longer authorized.');
+          return getDriveFor(account);
+        }
+        return getDriveFor(await getDefaultAccount());
+      });
+    } catch (error) {
+      log('Error handling GET /dl/:token', { error: (error as Error).message });
+      if (!res.headersSent) res.status(502).json({ error: 'Failed to stream file from Google Drive' });
+      else res.destroy(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
 
   /** Team mode: a session may only be touched by the user who initialized it.
    * A mismatch is answered exactly like an unknown session so other users

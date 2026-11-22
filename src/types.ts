@@ -44,6 +44,8 @@ export interface ToolContext {
    * human-readable email is stamped onto payloads by `ctx.log` itself rather
    * than stored here. */
   userId?: string;
+  accountAlias?: string;
+  uploadEndpointAvailable: boolean;
 
   // Multi-account surface (Phase 1: present on context but not yet consumed by tool
   // handlers — resolver always targets the sole default account).

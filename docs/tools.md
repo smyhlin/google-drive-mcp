@@ -1,6 +1,6 @@
 # Tool reference
 
-This server exposes 130 MCP tools across Google Drive, Docs, Sheets, Slides, and Calendar. Tool availability can depend on the granted OAuth scopes. Unless noted otherwise, every tool also accepts the optional top-level `account` parameter described in [Authentication](authentication.md#per-tool-account-selection).
+This server exposes 132 MCP tools across Google Drive, Docs, Sheets, Slides, and Calendar. Tool availability can depend on the granted OAuth scopes. Unless noted otherwise, every tool also accepts the optional top-level `account` parameter described in [Authentication](authentication.md#per-tool-account-selection).
 
 ## Available Tools
 
@@ -127,6 +127,18 @@ This server exposes 130 MCP tools across Google Drive, Docs, Sheets, Slides, and
   - `localPath`: Absolute local path to save the file (can be a directory or full file path)
   - `exportMimeType`: For Google Workspace files, MIME type to export as (optional, e.g., 'application/pdf', 'text/csv')
   - `overwrite`: Whether to overwrite existing files (optional, default: false)
+- **createUploadUrl** - In HTTP mode, create a one-use server URL so large files can be streamed from the client to Drive with `curl`, avoiding MCP message-size limits without buffering the full file
+  - `name`: Destination file name
+  - `mimeType`: MIME type (optional, defaults to `application/octet-stream`)
+  - `parentFolderId`: Destination folder ID for a new file (optional)
+  - `fileId`: Existing file ID to update in place instead of creating a new file (optional; incompatible with `parentFolderId`)
+  - `sizeBytes`: Exact upload length in bytes (optional)
+  - The returned URL expires after 10 minutes; upload with `curl -fSL -T <file> <uploadUrl>`. The bytes pass through the server and its HTTPS endpoint.
+
+- **createDownloadUrl** - Create a short-lived, limited-use URL that streams a Drive file to the client
+  - `fileId`: Google Drive file ID
+  - `ttlSeconds`: URL lifetime in seconds (optional, default 600, range 60–3600)
+  - `maxUses`: Maximum downloads (optional, default 2, range 1–5). The URL token is a bearer capability; keep it private.
 
 #### PDF Ingestion and Conversion (v1.6.0)
 - **convertPdfToGoogleDoc** - Convert a PDF already stored in Drive into an editable Google Doc
