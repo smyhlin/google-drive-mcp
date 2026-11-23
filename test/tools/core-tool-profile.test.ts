@@ -18,6 +18,8 @@ const CORE_TOOLS = [
   'updateTextFile',
   'uploadFile',
   'createUploadUrl',
+  'createBatchUploadUrl',
+  'commitStagedUpload',
   'createDownloadUrl',
 ].sort();
 

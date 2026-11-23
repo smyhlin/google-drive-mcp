@@ -4,8 +4,8 @@
 
 Connect an MCP client to Google Drive, Docs, Sheets, Slides, and Calendar through one self-hosted server. Search and organize files, create and edit Workspace content, manage sharing, and automate multi-step workflows while keeping control of the Google identity and credentials used for every call.
 > [!TIP]
-> - **Selective tool list:** Set `GOOGLE_DRIVE_MCP_TOOL_PROFILE=core` to show 16 file-workflow tools in `tools/list`. Other tools remain callable by name for compatibility.
-> - **Large uploads:** In HTTP mode, `createUploadUrl` returns a one-use URL for `curl -T <file> <url>`. The server streams the upload to Drive without buffering the entire file.
+> - **Selective tool list:** Set `GOOGLE_DRIVE_MCP_TOOL_PROFILE=core` to show 18 file-workflow tools in `tools/list`. Other tools remain callable by name for compatibility.
+> - **Large & batch uploads:** In HTTP mode, `createUploadUrl` (single file) and `createBatchUploadUrl` (multi-file PAX/USTAR TAR stream via `PUT /upload/batch/:token`) stream uploads to Drive in O(1) memory; `commitStagedUpload` concatenates staged Drive chunks (`raw` or `tar`) server-side with SHA-256 verification and automatic chunk cleanup — zero `curl` required.
 > - **In-place updates:** Pass `fileId` to update an existing Drive file without changing its ID.
 
 > [!NOTE]
@@ -16,7 +16,7 @@ Connect an MCP client to Google Drive, Docs, Sheets, Slides, and Calendar throug
 
 ## Why this server
 
-- **Drive-first workflows:** The full profile lists 132 tools for file management, Shared Drives, permissions, revisions, rich Docs editing, Sheets formatting, Slides authoring, and Calendar events. The `core` profile lists 16 file-workflow tools.
+- **Drive-first workflows:** The full profile lists 134 tools for file management, Shared Drives, permissions, revisions, rich Docs editing, Sheets formatting, Slides authoring, and Calendar events. The `core` profile lists 18 file-workflow tools.
 - **Local or hosted:** use stdio for a personal desktop client, Streamable HTTP for a hosted integration, or OAuth-protected team mode for a shared service.
 - **Identity control:** local OAuth supports multiple Google accounts and per-tool account selection; service accounts and externally managed OAuth tokens are also supported.
 - **Agent-friendly access:** tools expose targeted operations, while the optional `gdrive:///` resource interface supports direct reading and discovery.

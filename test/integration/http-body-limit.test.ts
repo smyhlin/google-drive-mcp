@@ -122,6 +122,14 @@ describe('Streamable HTTP request body limit', () => {
     });
     await res.text();
     assert.equal(res.status, 404);
+
+    const batchRes = await fetch(`${baseUrl}/upload/batch/invalid-token`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    await batchRes.text();
+    assert.equal(batchRes.status, 404);
   });
 
   it('rejects a body over the configured limit as JSON-RPC, not HTML', async () => {

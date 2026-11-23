@@ -488,6 +488,8 @@ const CORE_TOOL_NAMES: ReadonlySet<string> = new Set([
   'updateTextFile',
   'uploadFile',
   'createUploadUrl',
+  'createBatchUploadUrl',
+  'commitStagedUpload',
   'createDownloadUrl',
 ]);
 
@@ -1393,7 +1395,7 @@ interface CreateHttpAppOptions {
 
 /** Every path `app.post('/mcp')` matches, for middleware that must agree with it. */
 const MCP_PATH = /^\/mcp\/?$/i;
-const UPLOAD_PATH = /^\/upload\/[^/]+\/?$/i;
+const UPLOAD_PATH = /^\/upload\/(?:batch\/)?[^/]+\/?$/i;
 
 /** The hostnames the SDK's localhostHostValidation() accepts. */
 const LOCALHOST_HOSTS = ['127.0.0.1', 'localhost', '::1'];
@@ -1523,21 +1525,27 @@ function createHttpApp(host: string, options?: CreateHttpAppOptions) {
     : [];
   const sessions = new Map<string, HttpSession>();
   const sessionTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const resolveUploadAuthClient = async ({ userId, accountAlias }: largeFileTransferTools.UploadOwner) => {
+    if (teamAuth) {
+      if (!userId || !(await teamAuth.store.getUser(userId))) {
+        throw new Error('The Google account associated with this upload is no longer authorized.');
+      }
+      return teamAuth.clientFactory.getClient(userId);
+    }
+    if (accountAlias) {
+      const account = requireAuthSystem().store.get(accountAlias);
+      if (!account) throw new Error('The Google account associated with this upload is no longer authorized.');
+      return getAuthClientFor(account);
+    }
+    return getAuthClientFor(await getDefaultAccount());
+  };
+
+  app.put('/upload/batch/:token', async (req, res) => {
+    await largeFileTransferTools.streamBatchUpload(req, res, resolveUploadAuthClient);
+  });
+
   app.put('/upload/:token', async (req, res) => {
-    await largeFileTransferTools.streamUpload(req, res, async ({ userId, accountAlias }) => {
-      if (teamAuth) {
-        if (!userId || !(await teamAuth.store.getUser(userId))) {
-          throw new Error('The Google account associated with this upload is no longer authorized.');
-        }
-        return teamAuth.clientFactory.getClient(userId);
-      }
-      if (accountAlias) {
-        const account = requireAuthSystem().store.get(accountAlias);
-        if (!account) throw new Error('The Google account associated with this upload is no longer authorized.');
-        return getAuthClientFor(account);
-      }
-      return getAuthClientFor(await getDefaultAccount());
-    });
+    await largeFileTransferTools.streamUpload(req, res, resolveUploadAuthClient);
   });
 
   app.get('/dl/:token', async (req, res) => {

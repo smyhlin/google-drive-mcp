@@ -59,6 +59,8 @@ export const TOOL_META: Record<string, ToolMeta> = {
   downloadFile: read(DRIVE_READ_SCOPES),
   createDownloadUrl: read(DRIVE_READ_SCOPES),
   createUploadUrl: write(DRIVE_WRITE_SCOPES),
+  createBatchUploadUrl: write(DRIVE_WRITE_SCOPES),
+  commitStagedUpload: write(DRIVE_WRITE_SCOPES),
   listPermissions: read(DRIVE_READ_SCOPES),
   getRevisions: read(DRIVE_READ_SCOPES),
 

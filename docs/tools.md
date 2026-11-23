@@ -1,6 +1,6 @@
 # Tool reference
 
-This server exposes 132 MCP tools across Google Drive, Docs, Sheets, Slides, and Calendar. Tool availability can depend on the granted OAuth scopes. Unless noted otherwise, every tool also accepts the optional top-level `account` parameter described in [Authentication](authentication.md#per-tool-account-selection).
+This server exposes 134 MCP tools across Google Drive, Docs, Sheets, Slides, and Calendar. Tool availability can depend on the granted OAuth scopes. Unless noted otherwise, every tool also accepts the optional top-level `account` parameter described in [Authentication](authentication.md#per-tool-account-selection).
 
 ## Available Tools
 
@@ -134,6 +134,28 @@ This server exposes 132 MCP tools across Google Drive, Docs, Sheets, Slides, and
   - `fileId`: Existing file ID to update in place instead of creating a new file (optional; incompatible with `parentFolderId`)
   - `sizeBytes`: Exact upload length in bytes (optional)
   - The returned URL expires after 10 minutes; upload with `curl -fSL -T <file> <uploadUrl>`. The bytes pass through the server and its HTTPS endpoint.
+
+- **createBatchUploadUrl** - In HTTP mode, create a single short-lived URL (`PUT /upload/batch/:token`) that accepts an uncompressed POSIX PAX/USTAR/GNU TAR stream and streams each manifested entry directly to Google Drive in O(1) memory (create new or update in place via `fileId`)
+  - `files`: Non-empty array (1–100) of manifest objects:
+    - `archivePath`: Relative path of the file inside the TAR archive
+    - `name`: Target filename in Google Drive
+    - `mimeType`: MIME type (optional, defaults to `application/octet-stream`)
+    - `parentFolderId`: Destination folder ID for a new file (optional; incompatible with `fileId`)
+    - `fileId`: Existing file ID to update in place (optional; incompatible with `parentFolderId`)
+    - `sizeBytes`: Optional exact byte-size assertion for this entry
+  - The returned URL expires after 15 minutes and returns a per-file JSON summary (`uploaded`, `failed`, `missing`, `ignored`).
+
+- **commitStagedUpload** - Zero-`curl` upload bridge: concatenate one or more staged Google Drive chunk files in O(1) memory and commit the reconstructed payload to Drive as a single file (`format="raw"`, create or in-place update via `fileId`) or by streaming-unpacking a PAX/USTAR/GNU TAR archive (`format="tar"` with `files[]`), then permanently delete the staging chunks on clean commit
+  - `stagingFileIds`: Ordered array (1–100) of Google Drive file IDs for the staged file or split chunks
+  - `format`: `"raw"` (default when `files` is omitted) or `"tar"` (default when `files` is provided)
+  - `name`: Target filename in Google Drive (required for `format="raw"`)
+  - `mimeType`: MIME type for `format="raw"` (optional, defaults to `application/octet-stream`)
+  - `parentFolderId`: Destination folder ID for a new file (`format="raw"`; incompatible with `fileId`)
+  - `fileId`: Existing Drive file ID to update in place (`format="raw"`; incompatible with `parentFolderId`)
+  - `files`: Manifest of target entries when `format="tar"` (same shape as `createBatchUploadUrl`)
+  - `expectedSizeBytes`: Optional exact total byte length across all `stagingFileIds`, verified before writing
+  - `expectedSha256`: Optional 64-character hex SHA-256 checksum of the reconstructed payload
+  - `deleteStaging`: Permanently delete `stagingFileIds` after a clean commit (optional, default: `true`)
 
 - **createDownloadUrl** - Create a short-lived, limited-use URL that streams a Drive file to the client
   - `fileId`: Google Drive file ID
