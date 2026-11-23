@@ -1488,12 +1488,30 @@ function createHttpApp(host: string, options?: CreateHttpAppOptions) {
   // non-localhost binds the SDK otherwise applies no Host validation at all.
   const maxBodyBytes = options?.maxBodyBytes ?? runtimeConfig.maxBodyBytes;
   const app = buildMcpExpressApp(host, teamAuth ? teamAuth.config.allowedHosts : undefined);
+  if (process.env.MCP_HTTP_ACCESS_LOG === '1' || process.env.MCP_HTTP_ACCESS_LOG === 'true') {
+    app.use((req, res, next) => {
+      const start = Date.now();
+      res.on('finish', () => {
+        const ms = Date.now() - start;
+        const ua = String(req.headers['user-agent'] ?? '').slice(0, 80);
+        log(`[http] ${req.method} ${req.path} -> ${res.statusCode} (${ms}ms)`, {
+          ip: req.ip,
+          ua,
+        });
+      });
+      next();
+    });
+  }
   if (teamAuth) {
     if (teamAuth.config.trustProxy !== undefined) {
       // Without this, every user behind a reverse proxy shares the proxy's IP
       // and therefore one rate-limit bucket on /token and /register.
       app.set('trust proxy', teamAuth.config.trustProxy);
     }
+    const oauthRateLimit = {
+      windowMs: 15 * 60 * 1000,
+      limit: 300,
+    };
     // AS endpoints: /authorize, /token, /register, /revoke and the
     // .well-known metadata. Must be mounted at the app root, before /mcp.
     app.use(
@@ -1506,7 +1524,13 @@ function createHttpApp(host: string, options?: CreateHttpAppOptions) {
         // The SDK default expires client secrets after 30 days, which would
         // silently break long-lived connectors monthly; team-store growth is
         // bounded by the client cap instead.
-        clientRegistrationOptions: { clientSecretExpirySeconds: 0 },
+        clientRegistrationOptions: {
+          clientSecretExpirySeconds: 0,
+          rateLimit: oauthRateLimit,
+        },
+        authorizationOptions: { rateLimit: oauthRateLimit },
+        tokenOptions: { rateLimit: oauthRateLimit },
+        revocationOptions: { rateLimit: oauthRateLimit },
       }),
     );
     app.get(GOOGLE_CALLBACK_PATH, teamAuth.callbackHandler);
